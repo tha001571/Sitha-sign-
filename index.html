@@ -1,1 +1,217 @@
-index.html
+
+
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<meta name="theme-color" content="#7027d9">
+
+<title>Sitha-Sign</title>
+
+<style>
+
+*{box-sizing:border-box}
+
+body{margin:0;background:#100b1c;color:white;font-family:-apple-system,Arial;padding:24px}
+
+header{text-align:center;padding:25px 0}
+
+.logo{background:linear-gradient(135deg,#b794ff,#6825d9);width:65px;height:65px;border-radius:20px;display:grid;place-items:center;font-size:32px;font-weight:bold;margin:auto}
+
+h1{margin-bottom:5px}
+
+p{color:#bdb0d2}
+
+.card{background:#211632;border:1px solid #493260;border-radius:18px;padding:18px;margin:15px 0}
+
+button{background:#853ee8;color:white;border:0;border-radius:12px;padding:14px;width:100%;font-weight:bold;font-size:16px;margin-top:10px}
+
+input{width:100%;padding:13px;border-radius:10px;border:1px solid #72558c;background:#140d20;color:white;margin-top:10px}
+
+.file{border-bottom:1px solid #493260;padding:12px 0;overflow-wrap:anywhere}
+
+small{color:#bdb0d2}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<div class="logo">S</div>
+
+<h1>Sitha-Sign</h1>
+
+<p>IPA Downloader & Manager</p>
+
+</header>
+
+<div class="card">
+
+<h3>Import IPA</h3>
+
+<input type="file" id="ipa" accept=".ipa">
+
+<button onclick="importIPA()">Import IPA</button>
+
+<p id="message">Select an IPA file from your iPhone.</p>
+
+</div>
+
+<div class="card">
+
+<h3>Download IPA</h3>
+
+<input id="url" type="url" placeholder="Paste direct IPA download link">
+
+<button onclick="downloadIPA()">Download IPA</button>
+
+</div>
+
+<div class="card">
+
+<h3>My IPA Library</h3>
+
+<div id="library">No imported files yet.</div>
+
+</div>
+
+<p><small>Import stores files in this browser. Downloading does not install or sign an IPA. iOS requires a supported signing and installation method.</small></p>
+
+<script>
+
+const DB="SithaSignDB";
+
+let db;
+
+const request=indexedDB.open(DB,1);
+
+request.onupgradeneeded=e=>{
+
+ e.target.result.createObjectStore("files",{keyPath:"name"});
+
+};
+
+request.onsuccess=e=>{
+
+ db=e.target.result;
+
+ showFiles();
+
+};
+
+request.onerror=()=>document.getElementById("message").textContent="Storage unavailable.";
+
+function importIPA(){
+
+ const file=document.getElementById("ipa").files[0];
+
+ if(!file){alert("Choose an IPA file first.");return;}
+
+ if(!file.name.toLowerCase().endsWith(".ipa")){
+
+  alert("Please select an IPA file.");return;
+
+ }
+
+ const tx=db.transaction("files","readwrite");
+
+ tx.objectStore("files").put({name:file.name,size:file.size,blob:file});
+
+ tx.oncomplete=()=>{
+
+  document.getElementById("message").textContent="IPA imported successfully!";
+
+  showFiles();
+
+ };
+
+ tx.onerror=()=>alert("Import failed. Check available storage.");
+
+}
+
+function showFiles(){
+
+ if(!db)return;
+
+ const tx=db.transaction("files","readonly");
+
+ const req=tx.objectStore("files").getAll();
+
+ req.onsuccess=()=>{
+
+  const files=req.result;
+
+  document.getElementById("library").innerHTML=files.length?
+
+   files.map(f=>`<div class="file">📦 ${escapeHTML(f.name)}<br><small>${(f.size/1048576).toFixed(2)} MB</small><button onclick="saveFile('${encodeURIComponent(f.name)}')">Save to Files</button></div>`).join("")
+
+   :"No imported files yet.";
+
+ };
+
+}
+
+function escapeHTML(s){
+
+ return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+}
+
+function saveFile(encoded){
+
+ const name=decodeURIComponent(encoded);
+
+ const req=db.transaction("files","readonly").objectStore("files").get(name);
+
+ req.onsuccess=()=>{
+
+  const f=req.result;
+
+  if(!f)return;
+
+  const a=document.createElement("a");
+
+  const u=URL.createObjectURL(f.blob);
+
+  a.href=u;a.download=f.name;a.click();
+
+  setTimeout(()=>URL.revokeObjectURL(u),60000);
+
+ };
+
+}
+
+function downloadIPA(){
+
+ const value=document.getElementById("url").value.trim();
+
+ try{
+
+  const u=new URL(value);
+
+  if(!["https:","http:"].includes(u.protocol))throw Error();
+
+  location.href=u.href;
+
+ }catch{
+
+  alert("Enter a valid direct download URL.");
+
+ }
+
+}
+
+</script>
+
+</body>
+
+</html>
